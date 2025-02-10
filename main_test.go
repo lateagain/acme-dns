@@ -3,12 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
-	"io/ioutil"
+	"io"
 	"os"
 	"sync"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
 var loghook = new(logrustest.Hook)
@@ -44,7 +45,7 @@ func TestMain(m *testing.M) {
 		_ = newDb.Init("sqlite3", ":memory:")
 	}
 	DB = newDb
-	dnsserver = NewDNSServer(DB, Config.General.Listen, Config.General.Proto)
+	dnsserver = NewDNSServer(DB, Config.General.Listen, Config.General.Proto, Config.General.Domain)
 	dnsserver.ParseRecords(Config)
 
 	// Make sure that we're not creating a race condition in tests
@@ -56,7 +57,7 @@ func TestMain(m *testing.M) {
 	go dnsserver.Start(make(chan error, 1))
 	wg.Wait()
 	exitval := m.Run()
-	dnsserver.Server.Shutdown()
+	_ = dnsserver.Server.Shutdown()
 	DB.Close()
 	os.Exit(exitval)
 }
@@ -96,7 +97,7 @@ func setupConfig() {
 }
 
 func setupTestLogger() {
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	log.AddHook(loghook)
 }
 

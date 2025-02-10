@@ -50,13 +50,13 @@ var txtTablePG = `
 
 // getSQLiteStmt replaces all PostgreSQL prepared statement placeholders (eg. $1, $2) with SQLite variant "?"
 func getSQLiteStmt(s string) string {
-	re, _ := regexp.Compile("\\$[0-9]")
+	re, _ := regexp.Compile(`\$[0-9]`)
 	return re.ReplaceAllString(s, "?")
 }
 
 func (d *acmedb) Init(engine string, connection string) error {
-	d.Lock()
-	defer d.Unlock()
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
 	db, err := sql.Open(engine, connection)
 	if err != nil {
 		return err
@@ -68,12 +68,12 @@ func (d *acmedb) Init(engine string, connection string) error {
 	if versionString == "" {
 		versionString = "0"
 	}
-	_, err = d.DB.Exec(acmeTable)
-	_, err = d.DB.Exec(userTable)
+	_, _ = d.DB.Exec(acmeTable)
+	_, _ = d.DB.Exec(userTable)
 	if Config.Database.Engine == "sqlite3" {
-		_, err = d.DB.Exec(txtTable)
+		_, _ = d.DB.Exec(txtTable)
 	} else {
-		_, err = d.DB.Exec(txtTablePG)
+		_, _ = d.DB.Exec(txtTablePG)
 	}
 	// If everything is fine, handle db upgrade tasks
 	if err == nil {
@@ -136,10 +136,10 @@ func (d *acmedb) handleDBUpgradeTo1() error {
 	// Rollback if errored, commit if not
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return
 		}
-		tx.Commit()
+		_ = tx.Commit()
 	}()
 	_, _ = tx.Exec("DELETE FROM txt")
 	for _, subdomain := range subdomains {
@@ -165,23 +165,23 @@ func (d *acmedb) handleDBUpgradeTo1() error {
 func (d *acmedb) NewTXTValuesInTransaction(tx *sql.Tx, subdomain string) error {
 	var err error
 	instr := fmt.Sprintf("INSERT INTO txt (Subdomain, LastUpdate) values('%s', 0)", subdomain)
-	_, err = tx.Exec(instr)
-	_, err = tx.Exec(instr)
+	_, _ = tx.Exec(instr)
+	_, _ = tx.Exec(instr)
 	return err
 }
 
 func (d *acmedb) Register(afrom cidrslice) (ACMETxt, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
 	var err error
 	tx, err := d.DB.Begin()
 	// Rollback if errored, commit if not
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return
 		}
-		tx.Commit()
+		_ = tx.Commit()
 	}()
 	a := newACMETxt()
 	a.AllowFrom = cidrslice(afrom.ValidEntries())
@@ -210,8 +210,8 @@ func (d *acmedb) Register(afrom cidrslice) (ACMETxt, error) {
 }
 
 func (d *acmedb) GetByUsername(u uuid.UUID) (ACMETxt, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
 	var results []ACMETxt
 	getSQL := `
 	SELECT Username, Password, Subdomain, AllowFrom
@@ -248,8 +248,8 @@ func (d *acmedb) GetByUsername(u uuid.UUID) (ACMETxt, error) {
 }
 
 func (d *acmedb) GetTXTForDomain(domain string) ([]string, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
 	domain = sanitizeString(domain)
 	var txts []string
 	getSQL := `
@@ -282,8 +282,8 @@ func (d *acmedb) GetTXTForDomain(domain string) ([]string, error) {
 }
 
 func (d *acmedb) Update(a ACMETxtPost) error {
-	d.Lock()
-	defer d.Unlock()
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
 	var err error
 	// Data in a is already sanitized
 	timenow := time.Now().Unix()

@@ -8,11 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gavv/httpexpect"
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/cors"
-	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
 // noAuth function to write ACMETxt model to context while not preforming any validation
@@ -325,10 +325,6 @@ func TestApiUpdateWithCredentialsMockDB(t *testing.T) {
 func TestApiManyUpdateWithCredentials(t *testing.T) {
 	validTxtData := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-	updateJSON := map[string]interface{}{
-		"subdomain": "",
-		"txt":       ""}
-
 	router := setupRouter(true, false)
 	server := httptest.NewServer(router)
 	defer server.Close()
@@ -370,7 +366,7 @@ func TestApiManyUpdateWithCredentials(t *testing.T) {
 		{newUserWithValidCIDR.Username.String(), newUserWithValidCIDR.Password, newUserWithValidCIDR.Subdomain, validTxtData, 200},
 		{newUser.Username.String(), "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", newUser.Subdomain, validTxtData, 401},
 	} {
-		updateJSON = map[string]interface{}{
+		updateJSON := map[string]interface{}{
 			"subdomain": test.subdomain,
 			"txt":       test.txt}
 		e.POST("/update").
@@ -384,10 +380,6 @@ func TestApiManyUpdateWithCredentials(t *testing.T) {
 }
 
 func TestApiManyUpdateWithIpCheckHeaders(t *testing.T) {
-
-	updateJSON := map[string]interface{}{
-		"subdomain": "",
-		"txt":       ""}
 
 	router := setupRouter(false, false)
 	server := httptest.NewServer(router)
@@ -425,7 +417,7 @@ func TestApiManyUpdateWithIpCheckHeaders(t *testing.T) {
 		{newUserWithIP6CIDR, "2002:c0a7:0ff::0", 401},
 		{newUserWithIP6CIDR, "2002:c0a8:d3ad:b33f:c0ff:33b4:dc0d:3b4d", 200},
 	} {
-		updateJSON = map[string]interface{}{
+		updateJSON := map[string]interface{}{
 			"subdomain": test.user.Subdomain,
 			"txt":       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 		e.POST("/update").

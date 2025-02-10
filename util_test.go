@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
@@ -51,7 +50,7 @@ func TestReadConfig(t *testing.T) {
 			DNSConfig{},
 		},
 	} {
-		tmpfile, err := ioutil.TempFile("", "acmedns")
+		tmpfile, err := os.CreateTemp("", "acmedns")
 		if err != nil {
 			t.Error("Could not create temporary file")
 		}
@@ -99,16 +98,16 @@ func TestGetIPListFromHeader(t *testing.T) {
 }
 
 func TestFileCheckPermissionDenied(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "acmedns")
+	tmpfile, err := os.CreateTemp("", "acmedns")
 	if err != nil {
 		t.Error("Could not create temporary file")
 	}
 	defer os.Remove(tmpfile.Name())
-	syscall.Chmod(tmpfile.Name(), 0000)
+	_ = syscall.Chmod(tmpfile.Name(), 0000)
 	if fileIsAccessible(tmpfile.Name()) {
 		t.Errorf("File should not be accessible")
 	}
-	syscall.Chmod(tmpfile.Name(), 0644)
+	_ = syscall.Chmod(tmpfile.Name(), 0644)
 }
 
 func TestFileCheckNotExists(t *testing.T) {
@@ -118,7 +117,7 @@ func TestFileCheckNotExists(t *testing.T) {
 }
 
 func TestFileCheckOK(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "acmedns")
+	tmpfile, err := os.CreateTemp("", "acmedns")
 	if err != nil {
 		t.Error("Could not create temporary file")
 	}

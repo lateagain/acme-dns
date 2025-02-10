@@ -21,9 +21,6 @@ type DNSConfig struct {
 	Logconfig logconfig
 }
 
-// Auth middleware
-type authMiddleware struct{}
-
 // Config file general section
 type general struct {
 	Listen        string
@@ -51,6 +48,7 @@ type httpapi struct {
 	TLSCertPrivkey      string `toml:"tls_cert_privkey"`
 	TLSCertFullchain    string `toml:"tls_cert_fullchain"`
 	ACMECacheDir        string `toml:"acme_cache_dir"`
+	NotificationEmail   string `toml:"notification_email"`
 	CorsOrigins         []string
 	UseHeader           bool   `toml:"use_header"`
 	HeaderName          string `toml:"header_name"`
@@ -65,7 +63,7 @@ type logconfig struct {
 }
 
 type acmedb struct {
-	sync.Mutex
+	Mutex sync.Mutex
 	DB *sql.DB
 }
 
@@ -78,6 +76,4 @@ type database interface {
 	GetBackend() *sql.DB
 	SetBackend(*sql.DB)
 	Close()
-	Lock()
-	Unlock()
 }

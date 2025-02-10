@@ -12,6 +12,8 @@ Acme-dns provides a simple API exclusively for TXT record updates and should be 
 
 So basically it boils down to **accessibility** and **security**.
 
+For longer explanation of the underlying issue and other proposed solutions, see a blog post on the topic from EFF deeplinks blog: https://www.eff.org/deeplinks/2018/02/technical-deep-dive-securing-automation-acme-dns-challenge-validation
+
 ## Features
 - Simplified DNS server, serving your ACME DNS challenges (TXT)
 - Custom records (have your required A, AAAA, NS, etc. records served)
@@ -23,7 +25,7 @@ So basically it boils down to **accessibility** and **security**.
 
 ## Usage
 
-A Certbot authentication hook for acme-dns is available at: [https://github.com/joohoi/acme-dns-certbot](https://github.com/joohoi/acme-dns-certbot).
+A client application for acme-dns with support for Certbot authentication hooks is available at: [https://github.com/acme-dns/acme-dns-client](https://github.com/acme-dns/acme-dns-client).
 
 [![asciicast](https://asciinema.org/a/94903.png)](https://asciinema.org/a/94903)
 
@@ -108,22 +110,6 @@ The method can be used to check readiness and/or liveness of the server. It will
 
 ```GET /health```
 
-#### Example using a Kubernetes deployment
-
-```
-# ...
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 80
-  periodSeconds: 2
-  initialDelaySeconds: 2
-  failureThreshold: 3
-  successThreshold: 1
-livenessProbe:
-  # same as for readinessProbe...
-```
-
 ## Self-hosted
 
 You are encouraged to run your own acme-dns instance, because you are effectively authorizing the acme-dns server to act on your behalf in providing the answer to the challenging CA, making the instance able to request (and get issued) a TLS certificate for the domain that has CNAME pointing to it.
@@ -133,13 +119,22 @@ See the INSTALL section for information on how to do this.
 
 ## Installation
 
-1) Install [Go 1.11 or newer](https://golang.org/doc/install).
+1) Install [Go 1.13 or newer](https://golang.org/doc/install).
 
-2) Install acme-dns: `go get github.com/joohoi/acme-dns/...`. This will install acme-dns to `~/go/bin/acme-dns`.
+2) Build acme-dns: 
+```
+git clone https://github.com/joohoi/acme-dns
+cd acme-dns
+export GOPATH=/tmp/acme-dns
+go build
+```
 
-3) Edit config.cfg to suit your needs (see [configuration](#configuration)). `acme-dns` will read the configuration file from `/etc/acme-dns/config.cfg` or `./config.cfg`, or a location specified with the `-c` flag.
+3) Move the built acme-dns binary to a directory in your $PATH, for example:
+`sudo mv acme-dns /usr/local/bin`
 
-4) If your system has systemd, you can optionally install acme-dns as a service so that it will start on boot and be tracked by systemd. This also allows us to add the `CAP_NET_BIND_SERVICE` capability so that acme-dns can be run by a user other than root.
+4) Edit config.cfg to suit your needs (see [configuration](#configuration)). `acme-dns` will read the configuration file from `/etc/acme-dns/config.cfg` or `./config.cfg`, or a location specified with the `-c` flag.
+
+5) If your system has systemd, you can optionally install acme-dns as a service so that it will start on boot and be tracked by systemd. This also allows us to add the `CAP_NET_BIND_SERVICE` capability so that acme-dns can be run by a user other than root.
 
     1) Make sure that you have moved the configuration file to `/etc/acme-dns/config.cfg` so that acme-dns can access it globally.
 
@@ -155,7 +150,7 @@ See the INSTALL section for information on how to do this.
 
     7) Run acme-dns: `sudo systemctl start acme-dns.service`.
 
-5) If you did not install the systemd service, run `acme-dns`. Please note that acme-dns needs to open a privileged port (53, domain), so it needs to be run with elevated privileges.
+6) If you did not install the systemd service, run `acme-dns`. Please note that acme-dns needs to open a privileged port (53, domain), so it needs to be run with elevated privileges.
 
 ### Using Docker
 
@@ -211,7 +206,7 @@ You may want to test that acme-dns is working before using it for real queries.
 
 2) Call the `/register` API endpoint to register a test domain:
 ```
-$ curl -X POST http://auth.example.org/register
+$ curl -X POST https://auth.example.org/register
 {"username":"eabcdb41-d89f-4580-826f-3e62e9755ef2","password":"pbAXVjlIOE01xbut7YnAbkhMQIkcwoHO0ek2j4Q0","fulldomain":"d420c923-bbd7-4056-ab64-c3ca54c9b3cf.auth.example.org","subdomain":"d420c923-bbd7-4056-ab64-c3ca54c9b3cf","allowfrom":[]}
 ```
 
@@ -221,7 +216,7 @@ $ curl -X POST \
   -H "X-Api-User: eabcdb41-d89f-4580-826f-3e62e9755ef2" \
   -H "X-Api-Key: pbAXVjlIOE01xbut7YnAbkhMQIkcwoHO0ek2j4Q0" \
   -d '{"subdomain": "d420c923-bbd7-4056-ab64-c3ca54c9b3cf", "txt": "___validation_token_received_from_the_ca___"}' \
-  http://auth.example.org/update
+  https://auth.example.org/update
 ```
 
 Note: The `txt` field must be exactly 43 characters long, otherwise acme-dns will reject it
@@ -238,7 +233,7 @@ $ dig -t txt @auth.example.org d420c923-bbd7-4056-ab64-c3ca54c9b3cf.auth.example
 # DNS interface. Note that systemd-resolved may reserve port 53 on 127.0.0.53
 # In this case acme-dns will error out and you will need to define the listening interface
 # for example: listen = "127.0.0.1:53"
-listen = ":53"
+listen = "127.0.0.1:53"
 # protocol, "both", "both4", "both6", "udp", "udp4", "udp6" or "tcp", "tcp4", "tcp6"
 protocol = "both"
 # domain name to serve the requests off of
@@ -249,7 +244,7 @@ nsname = "auth.example.org"
 nsadmin = "admin.example.org"
 # predefined records served in addition to the TXT
 records = [
-    # domain pointing to the public IP of your acme-dns server
+    # domain pointing to the public IP of your acme-dns server 
     "auth.example.org. A 198.51.100.1",
     # specify that auth.example.org will resolve any *.auth.example.org records
     "auth.example.org. NS auth.example.org.",
@@ -261,27 +256,26 @@ debug = false
 # Database engine to use, sqlite3 or postgres
 engine = "sqlite3"
 # Connection string, filename for sqlite3 and postgres://$username:$password@$host/$db_name for postgres
+# Please note that the default Docker image uses path /var/lib/acme-dns/acme-dns.db for sqlite3
 connection = "/var/lib/acme-dns/acme-dns.db"
 # connection = "postgres://user:password@localhost/acmedns_db"
 
 [api]
-# domain name to listen requests for, mandatory if using tls = "letsencrypt"
-api_domain = ""
+# listen ip eg. 127.0.0.1
+ip = "0.0.0.0"
 # disable registration endpoint
 disable_registration = false
-# autocert HTTP port, eg. 80 for answering Let's Encrypt HTTP-01 challenges. Mandatory if using tls = "letsencrypt".
-autocert_port = "80"
-# listen ip, default "" listens on all interfaces/addresses
-ip = "127.0.0.1"
 # listen port, eg. 443 for default HTTPS
-port = "8080"
-# possible values: "letsencrypt", "cert", "none"
-tls = "none"
+port = "443"
+# possible values: "letsencrypt", "letsencryptstaging", "cert", "none"
+tls = "letsencryptstaging"
 # only used if tls = "cert"
 tls_cert_privkey = "/etc/tls/example.org/privkey.pem"
 tls_cert_fullchain = "/etc/tls/example.org/fullchain.pem"
 # only used if tls = "letsencrypt"
 acme_cache_dir = "api-certs"
+# optional e-mail address to which Let's Encrypt will send expiration notices for the API's cert
+notification_email = ""
 # CORS AllowOrigins, wildcards can be used
 corsorigins = [
     "*"
@@ -330,10 +324,11 @@ use for the renewal.
 - Posh-ACME: [https://github.com/rmbolger/Posh-ACME](https://github.com/rmbolger/Posh-ACME)
 - Sewer: [https://github.com/komuw/sewer](https://github.com/komuw/sewer)
 - Traefik: [https://github.com/containous/traefik](https://github.com/containous/traefik)
-- Windows ACME Simple (WACS): [https://github.com/PKISharp/win-acme](https://github.com/PKISharp/win-acme)
+- Windows ACME Simple (WACS): [https://www.win-acme.com](https://www.win-acme.com)
 
 ### Authentication hooks
 
+- acme-dns-client with Certbot authentication hook: [https://github.com/acme-dns/acme-dns-client](https://github.com/acme-dns/acme-dns-client)
 - Certbot authentication hook in Python:  [https://github.com/joohoi/acme-dns-certbot-joohoi](https://github.com/joohoi/acme-dns-certbot-joohoi)
 - Certbot authentication hook in Go: [https://github.com/koesie10/acme-dns-certbot-hook](https://github.com/koesie10/acme-dns-certbot-hook)
 
@@ -345,6 +340,14 @@ use for the renewal.
 
 ## Changelog
 
+- v0.8
+   - NOTE: configuration option: "api_domain" deprecated!
+   - New
+      - Automatic HTTP API certificate provisioning using DNS challenges making acme-dns able to acquire certificates even with HTTP api not being accessible from public internet.
+      - Configuration value for "tls": "letsencryptstaging". Setting it will help you to debug possible issues with HTTP API certificate acquiring process. This is the new default value.
+   - Changed
+      - Fixed: EDNS0 support
+      - Migrated from autocert to [certmagic](https://github.com/mholt/certmagic) for HTTP API certificate handling
 - v0.7.2
    - Changed
       - Fixed: Regression error of not being able to answer to incoming random-case requests.
